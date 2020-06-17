@@ -1134,16 +1134,23 @@ LUA;
 
         $cache = array();
 
+
         if ( $this->is_ignored_group( $group ) || ! $this->redis_status() ) {
             foreach ( $keys as $key ) {
-                $cache[ $key ] = $this->get( $key, $group, $force );
+                //$cache[ $key ] = $this->get( $key, $group, $force );
+
+                $cache[ $key ] = $this->get_from_internal_cache( $key, $group, $force );
+
             }
+
 
             return $cache;
         }
 
+        
         $derived_keys = array();
         $start_time = microtime( true );
+
 
         foreach ( $keys as $key ) {
             $derived_keys[ $key ] = $this->build_key( $key, $group );
@@ -1158,6 +1165,8 @@ LUA;
 
         $cache = array_combine( $keys, $cache );
 
+        
+
         foreach ( $cache as $key => $value ) {
             if ( $value ) {
                 $this->cache_hits++;
@@ -1165,6 +1174,12 @@ LUA;
             } else {
                 $this->cache_misses++;
             }
+        }
+
+        if ( isset( $force) ) {
+            $this->redis->mget( $cache );
+        } elseif ( !isset( $force) ) {
+            $this->redis->mget( array_values( $derived_keys ) );
         }
 
         $cache = array_map( array( $this, 'maybe_unserialize' ), $cache );
